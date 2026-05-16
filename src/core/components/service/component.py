@@ -1,0 +1,2 @@
+def component():
+    pass

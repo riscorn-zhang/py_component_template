@@ -1,0 +1,10 @@
+[project]
+name = "py_component_template"
+version = "0.1.0"
+description = "Component-based Python project template."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pluggy>=1.6.0",
+    "pydantic>=2.13.4",
+]
