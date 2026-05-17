@@ -10,7 +10,7 @@ import sys
 system = ComponentSystem()
 system.create_manager("app", [app_spec])
 system.register_component(
-    ComponentDescriptor(type="module", location="src.core.components.entry.component")
+    ComponentDescriptor(type="module", location="src.components.entry.component")
 )
 system.get_manager("app").hook.start_app(argv=sys.argv)
 
