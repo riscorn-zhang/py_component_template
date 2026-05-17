@@ -1,5 +1,3 @@
-from typing import List
-
 from src.core.system import ComponentSystem
 
 
@@ -8,7 +6,15 @@ def spec(system: ComponentSystem):
 
     class AppSpec:
         @hookspec
-        def start_app(self, argv: List[str]):
+        def entry(self):
+            pass
+
+        @hookspec
+        def start_service(self):
+            pass
+
+        @hookspec
+        def start_client(self):
             pass
 
     return AppSpec

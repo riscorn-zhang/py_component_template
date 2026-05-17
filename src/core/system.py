@@ -1,6 +1,7 @@
-import pluggy
 import importlib
-from typing import Dict, Callable, Type, List, Optional
+from typing import Dict, Callable, Type, List, Optional, Set
+
+import pluggy
 
 from src.core.descriptor import ComponentDescriptor
 from src.core.interface import ComponentInterface
@@ -24,9 +25,38 @@ class ComponentSystem:
             self.managers[name] = pluggy.PluginManager(name)
         return self.managers[name]
 
-    def del_manager(self, name: str):
+    def destroy_manager(self, name: str):
         if name in self.managers:
-            del self.managers[name]
+            manager = self.managers.pop(name)
+            for plugin in list(manager.get_plugins()):
+                manager.unregister(plugin)
+
+    def get_components(self, manager_name: str) -> Set[ComponentInterface]:
+        manager = self.get_manager(manager_name)
+        return manager.get_plugins()
+
+    def get_components_id(self, manager_name: str) -> Set[str]:
+        components: Set[ComponentInterface] = self.get_components(manager_name)
+        return set(component.id for component in components)
+
+    def del_component(self, component_id: str):
+        component = self.impl_components.pop(component_id, None)
+        if component:
+            try:
+                component.on_del()
+            except Exception:
+                pass
+            for manager_name in component.belong_managers:
+                manager = self.get_manager(manager_name)
+                manager.unregister(component)
+
+    def clear_components(self):
+        for component_id in list(self.impl_components.keys()):
+            self.del_component(component_id)
+
+    def shutdown(self):
+        self.clear_components()
+        self.managers.clear()
 
     def bind_spec_to_manager(self, name: str, spec: Callable[..., Type]):
         manager: pluggy.PluginManager = self.get_manager(name)
@@ -61,6 +91,14 @@ class ComponentSystem:
         """
         if component_descriptor.type == "module":
             return self.load_component_from_module(component_descriptor.location)
+        elif component_descriptor.type == "builtin":
+            return self.load_component_from_builtin(component_descriptor.location)
+        elif component_descriptor.type == "wheel":
+            return self.load_component_from_wheel(component_descriptor.location)
+        elif component_descriptor.type == "package":
+            return self.load_component_from_package(component_descriptor.location)
+        else:
+            raise RuntimeError(f"未知的组件类型: {component_descriptor.type}")
 
     def load_component_from_module(
         self, name: str
@@ -77,7 +115,12 @@ class ComponentSystem:
         except Exception as e:
             raise RuntimeError(f"加载模块 {name} 的 component 函数执行错误: {e}")
 
-    def load_component_from_file(self, path: str):
+    def load_component_from_builtin(
+        self, name: str
+    ) -> Optional[Type[ComponentInterface]]:
+        return self.load_component_from_module(f"src.components.{name}")
+
+    def load_component_from_wheel(self, path: str):
         pass
 
     def load_component_from_package(self, package: str):
@@ -88,9 +131,13 @@ class ComponentSystem:
         注册组件类
         """
         component = component_class()
-        self.impl_components[component.id()] = component
-        for manager_name in component.belong_managers():
-            self.get_manager(manager_name).register(component)
+        self.impl_components[component.id] = component
+        for manager_name in component.belong_managers:
+            self.get_manager(manager_name).register(component, component.id)
+        try:
+            component.on_init()
+        except Exception:
+            pass
 
     def register_component(self, component_descriptor: ComponentDescriptor):
         """

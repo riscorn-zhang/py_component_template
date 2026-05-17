@@ -1,24 +1,25 @@
-from typing import List
+from typing import List, Type
+import logging
 
 from src.core.system import ComponentSystem
 from src.core.interface import ComponentInterface
 
-from typing import Type
+logger = logging.getLogger(__name__)
 
 
 def component(system: ComponentSystem) -> Type[ComponentInterface]:
     hookimpl = system.get_impl_hook("app")
 
-    class EntryComponent(ComponentInterface):
-        def dependencies(self) -> List[str]:
-            return []
-
+    class ClientComponent(ComponentInterface):
+        @property
         def id(self) -> str:
-            return "entry"
+            return "app.cmdcli"
 
+        @property
         def name(self) -> str:
-            return "Entry"
+            return "Command Line Client"
 
+        @property
         def belong_managers(self) -> List[str]:
             return ["app"]
 
@@ -29,8 +30,7 @@ def component(system: ComponentSystem) -> Type[ComponentInterface]:
             pass
 
         @hookimpl
-        def start_app(self, argv: List[str]):
-            print("Starting app...")
-            print("Arguments:", argv)
+        def start_client(self):
+            logger.info("Starting command line client...")
 
-    return EntryComponent
+    return ClientComponent

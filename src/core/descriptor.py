@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Literal
 
-ComponentType = Literal["module", "builtin", "file", "package"]
+ComponentType = Literal["module", "builtin", "wheel", "package"]
 
 
 class ComponentDescriptor(BaseModel):
