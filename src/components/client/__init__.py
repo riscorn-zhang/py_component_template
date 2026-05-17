@@ -1,10 +1,15 @@
 from typing import List, Type
 import logging
+from pathlib import Path
 
 from src.core.system import ComponentSystem
 from src.core.interface import ComponentInterface
 
 logger = logging.getLogger(__name__)
+
+
+def meta_path() -> Path:
+    return Path(__file__).parent / "meta.toml"
 
 
 def component(system: ComponentSystem) -> Type[ComponentInterface]:
@@ -32,5 +37,6 @@ def component(system: ComponentSystem) -> Type[ComponentInterface]:
         @hookimpl
         def start_client(self):
             logger.info("Starting command line client...")
+            print("Hello, this is the command line client.")
 
     return ClientComponent

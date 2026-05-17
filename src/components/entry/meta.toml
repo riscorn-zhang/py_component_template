@@ -1,0 +1,9 @@
+id = "app.entry"
+name = "Entry"
+version = "0.1.0"
+description = "The entry point of the application."
+belong_managers = ["app"]
+
+[dependencies]
+python = ["argparse"]
+components = ["app.daemon", "app.cmdcli"]

@@ -1,36 +1,26 @@
-from typing import List, Type
+from typing import Type
 
 from src.core.system import ComponentSystem
 from src.core.interface import ComponentInterface
-from src.core.descriptor import ComponentDescriptor
+from src.core.info import ComponentSourceDescriptor
 from src.vars import runtimes
 
 import sys
 import logging
 import logging.config
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def meta_path() -> Path:
+    return Path(__file__).parent / "meta.toml"
 
 
 def component(system: ComponentSystem) -> Type[ComponentInterface]:
     hookimpl = system.get_impl_hook("app")
 
     class EntryComponent(ComponentInterface):
-        def dependencies(self) -> List[str]:
-            return []
-
-        @property
-        def id(self) -> str:
-            return "app.entry"
-
-        @property
-        def name(self) -> str:
-            return "Entry"
-
-        @property
-        def belong_managers(self) -> List[str]:
-            return ["app"]
-
         def on_del(self):
             pass
 
@@ -42,7 +32,7 @@ def component(system: ComponentSystem) -> Type[ComponentInterface]:
             logging.config.dictConfig(runtimes.LOGGING_DICT)
 
             logger.debug("")
-            logger.debug("=========Start New App=========")
+            logger.debug("=========Start New Process=========")
             logger.debug("")
 
             if len(sys.argv) > 1:
@@ -56,9 +46,20 @@ def component(system: ComponentSystem) -> Type[ComponentInterface]:
                 self.service()
                 self.client()
 
+            print(system.component_infos["app.daemon"])
+
+            text = ""
+
+            while True:
+                text = input("DEBUG >>> ")
+                if text == "exit":
+                    break
+
+                exec(text)
+
         def service(self):
             system.register_component(
-                ComponentDescriptor(type="builtin", location="service")
+                ComponentSourceDescriptor(type="builtin", location="service")
             )
             system.get_manager("app").hook.start_service()
 
@@ -67,7 +68,7 @@ def component(system: ComponentSystem) -> Type[ComponentInterface]:
             logging.config.dictConfig(runtimes.LOGGING_DICT)
 
             system.register_component(
-                ComponentDescriptor(type="builtin", location="client")
+                ComponentSourceDescriptor(type="builtin", location="client")
             )
             system.get_manager("app").hook.start_client()
 

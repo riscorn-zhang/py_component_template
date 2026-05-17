@@ -1,0 +1,9 @@
+id = "app.cmdcli"
+name = "Command Line Interface"
+version = "0.1.0"
+description = "The command line interface of the application."
+belong_managers = ["app"]
+
+[dependencies]
+python = []
+components = []

@@ -1,0 +1,9 @@
+id = "app.daemon"
+name = "Service Daemon"
+version = "0.1.0"
+description = "The service daemon of the application."
+belong_managers = ["app"]
+
+[dependencies]
+python = []
+components = []
