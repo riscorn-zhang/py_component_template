@@ -1,9 +1,9 @@
 from typing import Type
-import logging
 
 from src.core.system import ComponentSystem
 from src.core.interface import ComponentInterface
 
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -11,10 +11,15 @@ logger = logging.getLogger(__name__)
 def component(system: ComponentSystem) -> Type[ComponentInterface]:
     hookimpl = system.get_impl_hook("app")
 
-    class ServiceMainComponent(ComponentInterface):
-        @hookimpl
-        def start_service(self):
-            logger.info("Starting service daemon...")
-            logger.info("Daemon is always running.")
+    class Component(ComponentInterface):
+        def on_del(self):
+            pass
 
-    return ServiceMainComponent
+        def on_init(self):
+            pass
+
+        @hookimpl
+        def entry(self):
+            print("This is the knowledge library component.")
+
+    return Component

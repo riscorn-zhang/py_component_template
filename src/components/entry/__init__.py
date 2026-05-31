@@ -8,13 +8,8 @@ from src.vars import runtimes
 import sys
 import logging
 import logging.config
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
-
-
-def meta_path() -> Path:
-    return Path(__file__).parent / "meta.toml"
 
 
 def component(system: ComponentSystem) -> Type[ComponentInterface]:
@@ -55,7 +50,15 @@ def component(system: ComponentSystem) -> Type[ComponentInterface]:
                 if text == "exit":
                     break
 
-                exec(text)
+                try:
+                    print(eval(text))
+                except Exception:
+                    pass
+
+                try:
+                    exec(text)
+                except Exception as e:
+                    print(e.__class__.__name__, e)
 
         def service(self):
             system.register_component(

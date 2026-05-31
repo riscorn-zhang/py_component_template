@@ -38,4 +38,12 @@ LOGGING_DICT = {
     },
 }
 
+APP_CURRENT_DIR = ""
+
+
+def runtime_var_initialization(file_global_var):
+    global APP_CURRENT_DIR
+    APP_CURRENT_DIR = os.path.dirname(os.path.abspath(file_global_var))
+
+
 __all__ = ["APP_DIRS", "LOGGING_DICT"]

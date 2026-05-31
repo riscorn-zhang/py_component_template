@@ -13,8 +13,13 @@ from src.core.info import (
     ComponentDependencies,
 )
 from src.core.interface import ComponentInterface
+from src.core.packload import load_package_anonymously
 
 logger = logging.getLogger(__name__)
+
+
+class InitFileNotFoundError(FileNotFoundError):
+    pass
 
 
 class ComponentSystem:
@@ -56,7 +61,8 @@ class ComponentSystem:
                 info.instance.on_del()
             except Exception:
                 logger.error(
-                    f"组件 {component_id} 的 on_del 方法执行错误", exc_info=True
+                    f"Error occurred while executing on_del method for component {component_id}",
+                    exc_info=True,
                 )
 
             del self.component_infos[component_id]
@@ -134,34 +140,43 @@ class ComponentSystem:
         )
         return meta
 
-    def load_component(
-        self, component_descriptor: ComponentSourceDescriptor
-    ) -> Optional[ComponentInfo]:
+    def load_component_module(self, component_descriptor: ComponentSourceDescriptor):
         """
-        load_component 系列函数：
+        load_component_module 系列函数：
         通过函数动态生成Class,加载组件类型,但并未实现组件注册
         """
+
+        name = component_descriptor.location
+
         if component_descriptor.type == "module":
-            return self.load_component_from_module(component_descriptor.location)
+            return importlib.import_module(name)
         elif component_descriptor.type == "builtin":
-            return self.load_component_from_builtin(component_descriptor.location)
+            return importlib.import_module(f"src.components.{name}")
         elif component_descriptor.type == "wheel":
-            return self.load_component_from_wheel(component_descriptor.location)
+            raise NotImplementedError("Wheel Package Loading is not supported yet")
         elif component_descriptor.type == "package":
-            return self.load_component_from_package(component_descriptor.location)
+            return load_package_anonymously(self.normalize_to_init_path(name))
         else:
             raise RuntimeError(f"未知的组件类型: {component_descriptor.type}")
 
-    def load_component_from_module(self, name: str) -> Optional[ComponentInfo]:
-        module = importlib.import_module(name)
+    def load_component(self, module) -> Optional[ComponentInfo]:
+        """
+        load_component_module 系列函数：
+        通过函数动态生成Class,加载组件类型,并实现组件注册
 
-        for method_name in ["component", "meta_path"]:
+        """
+
+        name = module.__name__
+
+        for method_name in ["component"]:
             if not (hasattr(module, method_name)):
                 raise RuntimeError(f"模块 {name} 没有 {method_name} 函数")
 
         try:
             info = ComponentInfo(
-                meta=self.parse_toml_meta(module.meta_path()),
+                meta=self.parse_toml_meta(
+                    str(Path(str(module.__file__)).parent / "meta.toml")
+                ),
                 instance=module.component(self)(),
             )
             return info
@@ -172,18 +187,9 @@ class ComponentSystem:
         except Exception as e:
             raise RuntimeError(f"加载模块 {name} 的 component 函数执行错误: {e}")
 
-    def load_component_from_builtin(self, name: str) -> Optional[ComponentInfo]:
-        return self.load_component_from_module(f"src.components.{name}")
-
-    def load_component_from_wheel(self, path: str):
-        pass
-
-    def load_component_from_package(self, package: str):
-        pass
-
     def register_component_to_system(self, component_info: ComponentInfo):
         """
-        注册组件类（接受 ComponentInfo，以便保留 module_name 等元数据）
+        注册组件类（接受 ComponentInfo,以便保留 module_name 等元数据）
         """
         meta = component_info.meta
         instance = component_info.instance
@@ -204,6 +210,35 @@ class ComponentSystem:
         注册组件的完整链
         Load + Register
         """
-        component_info = self.load_component(component_descriptor)
+        module = self.load_component_module(component_descriptor)
+        component_info = self.load_component(module)
         if component_info:
             self.register_component_to_system(component_info)
+
+    def normalize_to_init_path(self, p: str) -> Path:
+        """
+        将传入的路径 p 统一转换为对应 __init__.py 的绝对路径。
+        参数:
+            p: str，可以是目录路径或 __init__.py 文件路径（绝对或相对）。
+        返回:
+            Path 对象，形如 /abs/path/to/pkg/__init__.py
+        异常:
+            InitFileNotFoundError:
+                - p 是目录，但目录下不存在 __init__.py
+                - p 是文件，但文件名不是 __init__.py
+            FileNotFoundError:
+                - p 本身不存在
+        """
+        path = Path(p).resolve()
+        if not path.exists():
+            raise FileNotFoundError(f"路径不存在: {path}")
+        if path.is_dir():
+            # 情况 1：目录 -> 目录下的 __init__.py
+            init_path = path / "__init__.py"
+            if not init_path.is_file():
+                raise InitFileNotFoundError(f"目录中没有 __init__.py: {path}")
+            return init_path
+        # 情况 2：文件 -> 必须是 __init__.py
+        if path.name != "__init__.py":
+            raise InitFileNotFoundError(f"文件不是 __init__.py: {path}")
+        return path

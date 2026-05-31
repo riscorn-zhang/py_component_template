@@ -1,15 +1,9 @@
 from typing import List, Type
 import logging
-from pathlib import Path
-
 from src.core.system import ComponentSystem
 from src.core.interface import ComponentInterface
 
 logger = logging.getLogger(__name__)
-
-
-def meta_path() -> Path:
-    return Path(__file__).parent / "meta.toml"
 
 
 def component(system: ComponentSystem) -> Type[ComponentInterface]:

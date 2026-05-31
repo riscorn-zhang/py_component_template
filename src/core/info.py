@@ -7,7 +7,7 @@ ComponentType = Literal["module", "builtin", "wheel", "package"]
 
 
 class ComponentSourceDescriptor(BaseModel):
-    """组件描述符类"""
+    """组件描述符类, 但是准备用 importlib.machinery.ModuleSpec 替代这个数据结构"""
 
     type: ComponentType
     location: str

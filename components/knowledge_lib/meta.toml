@@ -1,0 +1,9 @@
+id = "app.knowledge_lib"
+name = "AI Knowledge Library"
+version = "0.1.0"
+description = "AI Knowledge Library component."
+belong_managers = []
+
+[dependencies]
+python = []
+components = []
