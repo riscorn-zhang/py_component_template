@@ -14,7 +14,7 @@ class ComponentSourceDescriptor(BaseModel):
 
 
 class ComponentDependencies(BaseModel):
-    python: List[str] = Field(default_factory=list)
+    libraries: List[str] = Field(default_factory=list)
     components: List[str] = Field(default_factory=list)
 
 
