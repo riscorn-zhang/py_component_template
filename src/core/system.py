@@ -1,12 +1,3 @@
-<<<<<<< HEAD
-from typing import Callable, List, Optional
-
-from src.core.hub import ComponentHub
-from src.core.info import ComponentSourceDescriptor, ComponentInfo
-from src.core.interface import ComponentInterface
-from src.core.loader import ComponentLoader
-
-=======
 import logging
 from typing import Callable, List, Optional
 
@@ -17,7 +8,6 @@ from src.core.loader import ComponentLoader
 
 logger = logging.getLogger(__name__)
 
->>>>>>> da731b0 (支持组件间依赖识别与阻断组件)
 
 class ComponentSystem:
     def __init__(self):
@@ -42,8 +32,6 @@ class ComponentSystem:
 
     def get_component_info(self, component_id: str) -> Optional[ComponentInfo]:
         return self.hub.get_component_info(component_id)
-<<<<<<< HEAD
-=======
 
     def check_component_dependencies(self, meta: ComponentMeta) -> bool:
         missing = [
@@ -59,7 +47,6 @@ class ComponentSystem:
             )
             return False
         return True
->>>>>>> da731b0 (支持组件间依赖识别与阻断组件)
 
     def del_component(self, component_id: str):
         self.hub.del_component(component_id)
@@ -92,13 +79,6 @@ class ComponentSystem:
         self.hub.register_component_info(component_info)
 
     def register_component(self, component_descriptor: ComponentSourceDescriptor):
-<<<<<<< HEAD
-        module = self.loader.load_component_module(component_descriptor)
-        component_info = self.loader.load_component(module, self)
-        if component_info:
-            self.hub.register_component_info(component_info)
-        return component_info
-=======
         try:
             module = self.loader.load_component_module(component_descriptor)
             component_info = self.loader.load_component(module, self)
@@ -112,7 +92,6 @@ class ComponentSystem:
                 exc_info=True,
             )
             return None
->>>>>>> da731b0 (支持组件间依赖识别与阻断组件)
 
     def normalize_to_init_path(self, p: str):
         return self.loader.normalize_to_init_path(p)
