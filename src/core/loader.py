@@ -43,6 +43,13 @@ class ComponentLoader:
             components=list(deps_raw.get("components", []) or []),
         )
 
+        if dependencies.libraries:
+            logger.warning(
+                "Component %s declares library dependencies but library resolution is not handled yet: %s",
+                raw["id"],
+                dependencies.libraries,
+            )
+
         return ComponentMeta(
             id=raw["id"],
             name=raw["name"],
@@ -68,34 +75,66 @@ class ComponentLoader:
     def load_component_module(self, component_descriptor: ComponentSourceDescriptor):
         name = component_descriptor.location
 
-        if component_descriptor.type == "module":
-            return importlib.import_module(name)
-        elif component_descriptor.type == "builtin":
-            return importlib.import_module(f"src.components.{name}")
-        elif component_descriptor.type == "wheel":
-            raise NotImplementedError("Wheel Package Loading is not supported yet")
-        elif component_descriptor.type == "package":
-            return load_package_anonymously(self.normalize_to_init_path(name))
-        else:
-            raise RuntimeError(f"未知的组件类型: {component_descriptor.type}")
+        try:
+            if component_descriptor.type == "module":
+                return importlib.import_module(name)
+            elif component_descriptor.type == "builtin":
+                return importlib.import_module(f"src.components.{name}")
+            elif component_descriptor.type == "wheel":
+                logger.error("Wheel package loading is not supported yet: %s", name)
+                return None
+            elif component_descriptor.type == "package":
+                return load_package_anonymously(self.normalize_to_init_path(name))
+            else:
+                logger.error(
+                    "Unknown component type %s for descriptor %s",
+                    component_descriptor.type,
+                    name,
+                )
+                return None
+        except Exception as e:
+            logger.error(
+                "Failed to import component module %s: %s",
+                name,
+                e,
+                exc_info=True,
+            )
+            return None
 
     def load_component(
         self, module, system: "ComponentSystem"
     ) -> Optional[ComponentInfo]:
+        if module is None:
+            return None
+
         name = module.__name__
         if not hasattr(module, "component"):
-            raise RuntimeError(f"模块 {name} 没有 component 函数")
+            logger.error("模块 %s 没有 component 函数", name)
+            return None
 
         try:
+            meta = self.parse_toml_meta(
+                str(Path(str(module.__file__)).parent / "meta.toml")
+            )
+            if not system.check_component_dependencies(meta):
+                return None
             return ComponentInfo(
-                meta=self.parse_toml_meta(
-                    str(Path(str(module.__file__)).parent / "meta.toml")
-                ),
+                meta=meta,
                 instance=module.component(system)(),
             )
         except TypeError as e:
-            raise RuntimeError(
-                f"模块 {name} 的 component 或 meta_path 函数结构不匹配: {e}"
+            logger.error(
+                "Component %s has invalid component function signature: %s",
+                name,
+                e,
+                exc_info=True,
             )
+            return None
         except Exception as e:
-            raise RuntimeError(f"加载模块 {name} 的 component 函数执行错误: {e}")
+            logger.error(
+                "Failed to instantiate component %s: %s",
+                name,
+                e,
+                exc_info=True,
+            )
+            return None
