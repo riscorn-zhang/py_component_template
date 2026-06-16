@@ -1,6 +1,0 @@
-blacklist = [
-    "default",       # 禁用"default"插件id,防止与底层代码与架构起冲突
-    "system",        # 禁用"system"插件id,代指主程序
-    "app.eg.banned",
-]
-whitelist = ["[all]"]
