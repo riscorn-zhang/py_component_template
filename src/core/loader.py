@@ -4,7 +4,13 @@ from typing import TYPE_CHECKING, Dict, Optional, Any
 import importlib
 import logging
 import tomllib
+import importlib.machinery
+import sys
 from pathlib import Path
+from importlib import util
+
+from src.vars.functions import generate_anoymous_pkg_name
+
 
 from src.core.info import (
     ComponentSourceDescriptor,
@@ -12,7 +18,7 @@ from src.core.info import (
     ComponentInfo,
     ComponentDependencies,
 )
-from src.core.packload import load_package_anonymously
+from src.vars.debug import EXC_INFO
 
 if TYPE_CHECKING:
     from src.core.system import ComponentSystem
@@ -25,7 +31,43 @@ class InitFileNotFoundError(FileNotFoundError):
 
 
 class ComponentLoader:
-    def parse_toml_meta(self, file: str) -> ComponentMeta:
+    "组件加载器, 解析成ComponentInfo对象"
+
+    def _load_package_anonymously(self, package_path):
+        """
+        匿名加载一个包目录（包含 __init__.py 文件）并支持包内相对导入。
+        加载过程中会暂时使用一个随机包名注册到 sys.modules
+        加载完成后删除 sys.modules 中的相关条目，返回包模块对象。
+        :param package_path: 包的目录路径，如 '/path/to/package_a'
+        :return: 包的模块对象（相当于 import package_a 得到的对象）
+        """
+        package_path = Path(package_path).resolve()
+        init_file = package_path
+
+        pkg_name = generate_anoymous_pkg_name()
+        spec = util.spec_from_file_location(
+            pkg_name,
+            init_file,
+            loader=importlib.machinery.SourceFileLoader(pkg_name, str(init_file)),
+            submodule_search_locations=[str(package_path)],
+        )
+
+        if not spec or not spec.loader:
+            raise ImportError(f"Failed to load package: {package_path}")
+
+        module = util.module_from_spec(spec)
+        old_modules = set(sys.modules.keys())
+        sys.modules[pkg_name] = module
+        try:
+            spec.loader.exec_module(module)
+        finally:
+            new_modules = set(sys.modules.keys()) - old_modules
+            for name in list(new_modules):
+                if name == pkg_name or name.startswith(pkg_name + "."):
+                    sys.modules.pop(name, None)
+        return module
+
+    def _parse_toml_meta(self, file: str) -> ComponentMeta:
         path = Path(file)
         if not path.is_file():
             raise FileNotFoundError(f"meta.toml not found: {path}")
@@ -59,7 +101,7 @@ class ComponentLoader:
             dependencies=dependencies,
         )
 
-    def normalize_to_init_path(self, p: str) -> Path:
+    def _normalize_to_init_path(self, p: str) -> Path:
         path = Path(p).resolve()
         if not path.exists():
             raise FileNotFoundError(f"路径不存在: {path}")
@@ -84,7 +126,9 @@ class ComponentLoader:
                 logger.error("Wheel package loading is not supported yet: %s", name)
                 return None
             elif component_descriptor.type == "package":
-                return load_package_anonymously(self.normalize_to_init_path(name))
+                return self._load_package_anonymously(
+                    self._normalize_to_init_path(name)
+                )
             else:
                 logger.error(
                     "Unknown component type %s for descriptor %s",
@@ -92,14 +136,16 @@ class ComponentLoader:
                     name,
                 )
                 return None
-        except Exception as e:
+        except Exception:
             logger.error(
                 "Failed to import component module %s: %s",
                 name,
-                e,
-                exc_info=True,
+                exc_info=EXC_INFO,
             )
             return None
+
+    def load_component_meta(self, module):
+        return self._parse_toml_meta(str(Path(module.__file__).parent / "meta.toml"))
 
     def load_component(
         self, module, system: "ComponentSystem"
@@ -113,28 +159,24 @@ class ComponentLoader:
             return None
 
         try:
-            meta = self.parse_toml_meta(
-                str(Path(str(module.__file__)).parent / "meta.toml")
-            )
-            if not system.check_component_dependencies(meta):
+            meta = self.load_component_meta(module)
+            if not system._check_component_dependencies(meta):
                 return None
             return ComponentInfo(
                 meta=meta,
                 instance=module.component(system)(),
             )
-        except TypeError as e:
+        except TypeError:
             logger.error(
                 "Component %s has invalid component function signature: %s",
                 name,
-                e,
-                exc_info=True,
+                exc_info=EXC_INFO,
             )
             return None
-        except Exception as e:
+        except Exception:
             logger.error(
                 "Failed to instantiate component %s: %s",
                 name,
-                e,
-                exc_info=True,
+                exc_info=EXC_INFO,
             )
             return None

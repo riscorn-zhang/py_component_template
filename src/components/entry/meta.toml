@@ -5,5 +5,5 @@ description = "The entry point of the application."
 belong_managers = ["app"]
 
 [dependencies]
-python = ["argparse"]
+libraries = []
 components = ["app.daemon", "app.cmdcli"]

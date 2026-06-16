@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 def component(system: ComponentSystem) -> Type[ComponentInterface]:
-    hookimpl = system.get_impl_hook("app")
+    hookimpl = system.hub.get_impl_hook("app")
 
     class ClientComponent(ComponentInterface):
         @property
@@ -31,6 +31,7 @@ def component(system: ComponentSystem) -> Type[ComponentInterface]:
         @hookimpl
         def start_client(self):
             logger.info("Starting command line client...")
+            logger.warning("Starting application...")
             print("Hello, this is the command line client.")
 
     return ClientComponent

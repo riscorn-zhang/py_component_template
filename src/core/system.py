@@ -1,43 +1,29 @@
 import logging
-from typing import Callable, List, Optional
+from types import ModuleType
+from typing import Any, List, Dict
+from collections import defaultdict, deque
 
 from src.core.hub import ComponentHub
-from src.core.info import ComponentSourceDescriptor, ComponentInfo, ComponentMeta
-from src.core.interface import ComponentInterface
+from src.core.info import ComponentSourceDescriptor, ComponentMeta
 from src.core.loader import ComponentLoader
+from src.core.lib_provider import ComponentLibProvider
+from src.vars.debug import EXC_INFO
+from src.sugar import temperory_placeholder
 
 logger = logging.getLogger(__name__)
 
 
 class ComponentSystem:
-    def __init__(self):
+    def __init__(self) -> None:
         self.hub = ComponentHub()
         self.loader = ComponentLoader()
-        self.component_infos = self.hub.component_infos
+        self.lib_provider = ComponentLibProvider()
 
-    def create_manager(self, name: str, specs: List[Callable[..., type]] = []):
-        self.hub.create_manager(name, specs)
-
-    def get_manager(self, name: str):
-        return self.hub.get_manager(name)
-
-    def destroy_manager(self, name: str):
-        self.hub.destroy_manager(name)
-
-    def get_components(self, manager_name: str) -> set[ComponentInterface]:
-        return self.hub.get_components(manager_name)
-
-    def get_components_id(self, manager_name: str) -> set[str]:
-        return self.hub.get_components_id(manager_name)
-
-    def get_component_info(self, component_id: str) -> Optional[ComponentInfo]:
-        return self.hub.get_component_info(component_id)
-
-    def check_component_dependencies(self, meta: ComponentMeta) -> bool:
+    def _check_component_dependencies(self, meta: ComponentMeta) -> bool:
         missing = [
             dependency
             for dependency in meta.dependencies.components
-            if dependency not in self.component_infos
+            if dependency not in self.hub.component_infos
         ]
         if missing:
             logger.error(
@@ -48,53 +34,105 @@ class ComponentSystem:
             return False
         return True
 
-    def del_component(self, component_id: str):
-        self.hub.del_component(component_id)
+    def __components_dependencies_filter(
+        self, metas: Dict[str, ComponentMeta]
+    ) -> List[str]:
+        installed_ids = set(self.hub.get_components_ids())
+        new_ids = set(metas.keys())
 
-    def clear_components(self):
-        self.hub.clear_components()
+        avaliable = installed_ids | new_ids
 
-    def shutdown(self):
+        # 1.预处理.先剔除依赖不存在的组件
+        for node in new_ids:
+            for dep in metas[node].dependencies.components:
+                if dep not in avaliable:
+                    logger.error(
+                        "Component '%s' cannot be loaded because missing component dependency: %s",
+                        node,
+                        dep,
+                    )
+                    new_ids.remove(node)
+                    break
+
+        # 2.构建依赖图
+
+        dep_graph = defaultdict(set)
+        in_degree = {node: 0 for node in new_ids}
+
+        for node in new_ids:
+            for dep in metas[node].dependencies.components:
+                if dep in new_ids:
+                    dep_graph[dep].add(node)
+                    in_degree[node] += 1
+
+        # 3.拓扑排序
+        queue = deque([node for node in new_ids if in_degree[node] == 0])
+        sorted_ids = []
+
+        while queue:
+            curr = queue.popleft()
+            sorted_ids.append(curr)
+            for dep in dep_graph[curr]:
+                in_degree[dep] -= 1
+                if in_degree[dep] == 0:
+                    queue.append(dep)
+
+        return sorted_ids
+
+    def shutdown(self) -> None:
         self.hub.shutdown()
 
-    def bind_spec_to_manager(self, name: str, spec: Callable[..., type]):
-        self.hub.bind_spec_to_manager(name, spec)
-
-    def get_spec_hook(self, name: str):
-        return self.hub.get_spec_hook(name)
-
-    def get_impl_hook(self, name: str):
-        return self.hub.get_impl_hook(name)
-
-    def execute_hook(self, manager_name: str, hook_name: str, *args, **kwargs):
+    def execute_hook(
+        self, manager_name: str, hook_name: str, *args: Any, **kwargs: Any
+    ) -> Any:
         return self.hub.execute_hook(manager_name, hook_name, *args, **kwargs)
 
-    def load_component_module(self, component_descriptor: ComponentSourceDescriptor):
-        return self.loader.load_component_module(component_descriptor)
+    exec_ = x = hook = execute_hook
 
-    def load_component(self, module):
-        return self.loader.load_component(module, self)
-
-    def register_component_to_system(self, component_info: ComponentInfo):
-        self.hub.register_component_info(component_info)
-
-    def register_component(self, component_descriptor: ComponentSourceDescriptor):
+    def register_component(
+        self, component_descriptor: ComponentSourceDescriptor
+    ) -> None:
         try:
             module = self.loader.load_component_module(component_descriptor)
             component_info = self.loader.load_component(module, self)
             if component_info:
                 self.hub.register_component_info(component_info)
-            return component_info
         except Exception:
             logger.error(
                 "Unexpected failure registering component descriptor %s",
-                component_descriptor,
-                exc_info=True,
+                exc_info=EXC_INFO,
             )
-            return None
 
-    def normalize_to_init_path(self, p: str):
-        return self.loader.normalize_to_init_path(p)
+    def batch_register_components(
+        self, component_descriptors: list[ComponentSourceDescriptor]
+    ) -> None:
+        modules = [
+            self.loader.load_component_module(component_descriptor)
+            for component_descriptor in component_descriptors
+        ]
 
-    def parse_toml_meta(self, file: str):
-        return self.loader.parse_toml_meta(file)
+        metas = {}
+        module_dict = {}
+
+        for module in modules:
+            meta = self.loader.load_component_meta(module)
+            if meta:
+                metas[meta.id] = meta
+                module_dict[meta.id] = module
+
+        will_install_components_ids = self.__components_dependencies_filter(metas)
+
+        for install_id in will_install_components_ids:
+            module = module_dict[install_id]
+            component_info = self.loader.load_component(module, self)
+            if component_info:
+                self.hub.register_component_info(component_info)
+
+    def import_(self, module_name: str) -> ModuleType:
+        raise NotImplementedError()
+
+    def import_all_from(self, module_name: str) -> ModuleType:
+        raise NotImplementedError()
+
+    def from_import(self, module_name: str) -> ModuleType:
+        raise NotImplementedError()

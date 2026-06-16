@@ -2,9 +2,9 @@
 from src.specs.app import spec as app_spec
 
 INIT_COMPONENTS = [
+    "src/components/entry",
     "src/components/service",
     "src/components/client",
-    "src/components/entry",
 ]
 
 INIT_MANAGERS = {

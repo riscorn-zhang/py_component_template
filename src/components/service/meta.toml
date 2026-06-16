@@ -5,5 +5,5 @@ description = "The service daemon of the application."
 belong_managers = ["app"]
 
 [dependencies]
-python = []
+libraries = []
 components = []

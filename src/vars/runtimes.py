@@ -3,6 +3,7 @@ import src.vars.infos as infos
 
 import platformdirs
 import os
+import logging.config
 
 APP_DIRS = platformdirs.PlatformDirs(appname=infos.APP_NAME, appauthor=infos.APP_AUTHOR)
 
@@ -44,6 +45,10 @@ APP_CURRENT_DIR = ""
 def runtime_var_initialization(file_global_var):
     global APP_CURRENT_DIR
     APP_CURRENT_DIR = os.path.dirname(os.path.abspath(file_global_var))
+
+
+def flush_logging_config():
+    logging.config.dictConfig(LOGGING_DICT)
 
 
 __all__ = ["APP_DIRS", "LOGGING_DICT"]

@@ -6,11 +6,14 @@ import logging
 
 from src.core.info import ComponentInfo
 from src.core.interface import ComponentInterface
+from src.vars.debug import EXC_INFO
 
 logger = logging.getLogger(__name__)
 
 
 class ComponentHub:
+    """组件生命周期管理中心，负责组件的注册、销毁、查询等功能"""
+
     def __init__(self):
         self.managers: Dict[str, pluggy.PluginManager] = {}
         self.spec_hooks: Dict[str, pluggy.HookspecMarker] = {}
@@ -42,8 +45,11 @@ class ComponentHub:
         manager = self._get_manager(manager_name)
         return manager.get_plugins()
 
-    def get_components_id(self, manager_name: str) -> Set[str]:
+    def get_components_id_from_manager(self, manager_name: str) -> Set[str]:
         return self.managers_components.get(manager_name, set())
+
+    def get_components_ids(self) -> Set[str]:
+        return set(self.component_infos.keys())
 
     def get_component_info(self, component_id: str) -> Optional[ComponentInfo]:
         return self.component_infos.get(component_id)
@@ -60,7 +66,7 @@ class ComponentHub:
         try:
             instance.on_init()
         except Exception:
-            logger.error(f"组件 {meta.id} 的 on_init 方法执行错误", exc_info=True)
+            logger.error(f"组件 {meta.id} 的 on_init 方法执行错误", exc_info=EXC_INFO)
 
     def del_component(self, component_id: str):
         info = self.component_infos.get(component_id)
@@ -72,7 +78,7 @@ class ComponentHub:
         except Exception:
             logger.error(
                 f"Error occurred while executing on_del method for component {component_id}",
-                exc_info=True,
+                exc_info=EXC_INFO,
             )
 
         del self.component_infos[component_id]
